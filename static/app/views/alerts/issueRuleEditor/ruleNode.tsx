@@ -423,8 +423,9 @@ class RuleNode extends React.Component<Props> {
                         config={node.formFields as Config}
                         appName={node.prompt}
                         onSubmitSuccess={this.updateParentFromSentryAppRule}
-                        // Ignore the `id` field, as that is related to the Rule Node, not the Sentry App
-                        resetValues={omit(data, 'id')}
+                        // TODO(leander): Prevent schemas from being saved with these fields as their 'name' values
+                        // Ignore the `id` and `name` field, as that is related to the Rule Node, not the Sentry App
+                        resetValues={omit(data, ['id', 'name'])}
                       />
                     ),
                     {allowClickClose: false}

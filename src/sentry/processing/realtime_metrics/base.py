@@ -1,10 +1,13 @@
 import datetime
-from typing import Optional, Set
+from collections import namedtuple
+from typing import Iterable, Optional, Set
 
 from sentry.utils import redis
 
 # redis key for entry storing current list of LPQ members
 LPQ_MEMBERS_KEY = "store.symbolicate-event-lpq-selected"
+
+BucketedCount = namedtuple("BucketedCount", ["timestamp", "count"])
 
 
 class RealtimeMetricsStore:
@@ -40,6 +43,50 @@ class RealtimeMetricsStore:
             pipeline.set(key, 0, nx=True, px=self._counter_ttl)
             pipeline.incr(key)
             pipeline.execute()
+
+    def get_lpq_candidates(self) -> Iterable[int]:
+        """
+        Returns IDs of all projects that should be considered for the low priority queue.
+        """
+
+        already_seen = set()
+        for item in self.inner.scan_iter(
+            match=f"{self._prefix}:*",
+        ):
+            _prefix, project_id_raw, _else = item.split(":")
+            project_id = _to_int(project_id_raw)
+            if project_id is not None and project_id not in already_seen:
+                already_seen.add(project_id)
+                yield project_id
+
+    def get_bucketed_counts_for_project(self, project_id: int) -> Iterable[BucketedCount]:
+        """
+        Returns a sorted list of timestamps (bucket size unknown) and the count of symbolicator
+        requests made during that timestamp for some given project.
+        """
+
+        # TODO: Should all entries be normalized against the current bucket size?
+        keys = sorted(
+            (
+                key
+                for key in self.inner.scan_iter(
+                    match=f"{self._prefix}:{project_id}:*",
+                )
+            )
+        )
+        counts = self.inner.mget(keys)
+
+        for key, count_raw in zip(keys, counts):
+            _prefix, _project_id, timestamp_raw = key.split(":")
+
+            timestamp_bucket = _to_int(timestamp_raw)
+            count = _to_int(count_raw)
+
+            if timestamp_bucket is not None and count is not None:
+                yield BucketedCount(timestamp=timestamp_bucket, count=count)
+            else:
+                # TODO: log if this happens? remove the key?
+                pass
 
     # TODO: do these killswitch helpers belong here, or in a different class? LowPriorityQueueStore?
     # This probably needs locking

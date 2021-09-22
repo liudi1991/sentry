@@ -67,11 +67,9 @@ class RealtimeMetricsStore:
 
         # TODO: Should all entries be normalized against the current bucket size?
         keys = sorted(
-            (
-                key
-                for key in self.inner.scan_iter(
-                    match=f"{self._prefix}:{project_id}:*",
-                )
+            key
+            for key in self.inner.scan_iter(
+                match=f"{self._prefix}:{project_id}:*",
             )
         )
         counts = self.inner.mget(keys)

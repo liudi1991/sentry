@@ -30,12 +30,12 @@ def scan_for_suspect_projects() -> None:
 
 
 def _scan_for_suspect_projects() -> None:
-    suspect_projects = set([])
+    suspect_projects = set()
     for project_id in realtime_metrics_store.get_lpq_candidates():
         suspect_projects.add(project_id)
         compute_lpq_eligibility(project_id)
 
-    current_lpq_projects = realtime_metrics_store.get_lpq_projects() or set([])
+    current_lpq_projects = realtime_metrics_store.get_lpq_projects() or set()
     deleted_projects = current_lpq_projects.difference(suspect_projects)
 
     if len(deleted_projects) == 0:
